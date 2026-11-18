@@ -54,6 +54,10 @@ header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, va
 .sel-bubble button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 650 }
 .sel-bubble svg { width: 17px; height: 17px }
 #selSave { background: #30D158; color: #0B2E14 }
+#selListen, #selSlow { background: #0A84FF; color: #fff }
+#selSlow { padding: 0 11px; font-size: 17px }
+#selListen.on, #selSlow.on { background: #fff; color: #0A84FF }
+@media (max-width: 480px) { .sel-bubble button { padding: 0 11px } #selCm .lb { display: none } }
 #selCm { background: #FF9F0A; color: #1D1D1F }
 /* ---- the words you save to practice their pronunciation ---- */
 .wd { border: .5px solid var(--line); border-left: 3px solid #30D158; border-radius: 4px 12px 12px 4px; padding: 10px 12px; background: color-mix(in srgb, #30D158 6%, transparent) }
@@ -189,8 +193,10 @@ main { max-width: 760px; margin: 0 auto; padding: 16px }
 <main id="list"></main>
 
 <div class="sel-bubble" id="selBubble" hidden>
+  <button id="selListen" type="button" title="Listen (it isn't saved)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Listen</button>
+  <button id="selSlow" type="button" title="Listen slowly" aria-label="Listen slowly">🐢</button>
   <button id="selSave" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg><span>Save</span></button>
-  <button id="selCm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6"/><path d="M9 10h6"/></svg>Comment</button>
+  <button id="selCm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6"/><path d="M9 10h6"/></svg><span class="lb">Comment</span></button>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -635,6 +641,23 @@ main { max-width: 760px; margin: 0 auto; padding: 16px }
   addEventListener("scroll", () => { if (!bubble.hidden) checkSel() }, { passive: true });
   bubble.addEventListener("pointerdown", e => e.preventDefault());  // keep the selection when the button is pressed
   document.getElementById("selCm").onclick = () => { if (pending) { openCm({ id: Date.now(), ...pending, note: "" }); getSelection().removeAllRanges() } };
+  // Listen to the words you selected, normal or slow; nothing is saved and the selection stays (so you can still save it).
+  function sayPicked(slow, btn) {
+    if (!pending) return;
+    const text = pending.quote.replace(/\s*\([a-z·'\-]+\)/g, "");
+    if (playing) pause();
+    wordTok++; speechSynthesis.cancel();
+    document.querySelectorAll("#selListen.on, #selSlow.on").forEach(b => b.classList.remove("on"));
+    const u = new SpeechSynthesisUtterance(speechOf(text).say), v = voice();
+    if (v) u.voice = v;
+    u.lang = v ? v.lang.replace("_", "-") : "en-US";
+    u.rate = slow ? 0.6 : rate;
+    u.onend = u.onerror = () => btn.classList.remove("on");
+    btn.classList.add("on");
+    setTimeout(() => speechSynthesis.speak(u), 120);
+  }
+  document.getElementById("selListen").onclick = e => sayPicked(false, e.currentTarget);
+  document.getElementById("selSlow").onclick = e => sayPicked(true, e.currentTarget);
   document.getElementById("selSave").onclick = () => { if (pending) { saveWord(pending); getSelection().removeAllRanges(); bubble.hidden = true } };
   list.addEventListener("click", e => {
     const add = e.target.closest("[data-cm]");
